@@ -31,7 +31,7 @@ app.get("/api/notes", (request, response) => {
 
 // Get a single note by id
 app.get("/api/notes/:id", (request, response, next) => {
-  Note.findById(request.params.id)
+  Note.findByIdAndUpdate(request.params.id)
     .then((note) => {
       if (note) {
         response.json(note);
@@ -44,7 +44,7 @@ app.get("/api/notes/:id", (request, response, next) => {
 
 // Delete a note by id
 app.delete("/api/notes/:id", (request, response, next) => {
-  Note.findByIdAndRemove(request.params.id)
+  Note.findByIdAndUpdateAndRemove(request.params.id)
     .then(() => {
       response.status(204).end();
     })
@@ -55,7 +55,7 @@ app.delete("/api/notes/:id", (request, response, next) => {
 app.post("/api/notes", (request, response, next) => {
   const body = request.body;
 
-  if (!body.content) {
+  if (!body.content === undefined) {
     return response.status(400).json({
       error: "content missing",
     });
@@ -74,24 +74,28 @@ app.post("/api/notes", (request, response, next) => {
     .catch((error) => next(error));
 });
 
-app.put('/api/notes/:id', (request, response, next) => {
-  const { content, important } = request.body
+app.put("/api/notes/:id", (request, response, next) => {
+  const { content, important } = request.body;
 
-  Note.findById(request.params.id)
+  Note.findByIdAndUpdate(
+    request.params.id,
+    { content, important },
+    { new: true, runValidators: true, context: "query" }
+  )
     .then((note) => {
       if (!note) {
-        return response.status(404).end()
+        return response.status(404).end();
       }
 
-      note.content = content
-      note.important = important
+      note.content = content;
+      note.important = important;
 
       return note.save().then((updatedNote) => {
-        response.json(updatedNote)
-      })
+        response.json(updatedNote);
+      });
     })
-    .catch((error) => next(error))
-})
+    .catch((error) => next(error));
+});
 
 // Unknown endpoint middleware
 const unknownEndpoint = (request, response) => {
@@ -105,6 +109,8 @@ const errorHandler = (error, request, response, next) => {
 
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
   }
 
   next(error);
